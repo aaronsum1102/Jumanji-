@@ -1,12 +1,12 @@
 package jumanji.sda.com.jumanji
 
-import android.arch.lifecycle.ViewModelProviders
+import androidx.lifecycle.ViewModelProviders
 import android.os.Bundle
-import android.support.design.widget.TabLayout
-import android.support.v4.app.Fragment
-import android.support.v4.app.FragmentManager
-import android.support.v4.app.FragmentPagerAdapter
-import android.support.v7.app.AppCompatActivity
+import com.google.android.material.tabs.TabLayout
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
+import androidx.fragment.app.FragmentPagerAdapter
+import androidx.appcompat.app.AppCompatActivity
 import android.widget.Toast
 import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -25,23 +25,23 @@ class ProgramActivity : AppCompatActivity() {
         val adapter = PagerAdapter(supportFragmentManager)
         container.adapter = adapter
 
-        container.addOnPageChangeListener(TabLayout.TabLayoutOnPageChangeListener(tabs))
-        tabs.addOnTabSelectedListener(TabLayout.ViewPagerOnTabSelectedListener(container))
+        container.addOnPageChangeListener(com.google.android.material.tabs.TabLayout.TabLayoutOnPageChangeListener(tabs))
+        tabs.addOnTabSelectedListener(com.google.android.material.tabs.TabLayout.ViewPagerOnTabSelectedListener(container))
 
         val pinViewModel = ViewModelProviders.of(this)[PinViewModel::class.java]
         pinViewModel.queryDataFromFirebaseToRoom()
 
     }
 
-    class PagerAdapter(fragmentManger: FragmentManager) : FragmentPagerAdapter(fragmentManger) {
+    class PagerAdapter(fragmentManger: androidx.fragment.app.FragmentManager) : androidx.fragment.app.FragmentPagerAdapter(fragmentManger) {
         companion object {
             private const val NO_OF_TABS = 3
         }
 
-        override fun getItem(position: Int): Fragment {
+        override fun getItem(position: Int): androidx.fragment.app.Fragment {
             return when (position) {
 
-                1 -> Fragment()
+                1 -> androidx.fragment.app.Fragment()
                 2 -> ProfileFragment()
                 else -> MapFragment()
             }

@@ -1,8 +1,8 @@
 package jumanji.sda.com.jumanji
 
-import android.arch.lifecycle.LiveData
-import android.arch.lifecycle.MediatorLiveData
-import android.arch.lifecycle.ViewModel
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MediatorLiveData
+import androidx.lifecycle.ViewModel
 import com.google.firebase.firestore.DocumentReference
 import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers

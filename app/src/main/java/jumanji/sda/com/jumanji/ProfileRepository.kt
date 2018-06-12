@@ -1,6 +1,6 @@
 package jumanji.sda.com.jumanji
 
-import android.arch.lifecycle.MutableLiveData
+import androidx.lifecycle.MutableLiveData
 import android.content.Context
 import android.net.Uri
 import android.util.Log

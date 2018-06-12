@@ -2,8 +2,8 @@ package jumanji.sda.com.jumanji
 
 import android.Manifest
 import android.app.Activity
-import android.arch.lifecycle.Observer
-import android.arch.lifecycle.ViewModelProviders
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProviders
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
@@ -12,11 +12,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import android.support.design.widget.Snackbar
-import android.support.v4.app.ActivityCompat
-import android.support.v4.app.Fragment
-import android.support.v4.content.FileProvider
-import android.support.v7.app.AlertDialog
+import com.google.android.material.snackbar.Snackbar
+import androidx.core.app.ActivityCompat
+import androidx.fragment.app.Fragment
+import androidx.core.content.FileProvider
+import androidx.appcompat.app.AlertDialog
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -55,7 +55,7 @@ interface OnPermissionGrantedCallback {
     fun actionWithPermission(context: Context)
 }
 
-class MapFragment : Fragment(), PhotoListener, OnMapReadyCallback, SetOnPopUpWindowAdapter, OnUrlAvailableCallback, OnPermissionGrantedCallback {
+class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyCallback, SetOnPopUpWindowAdapter, OnUrlAvailableCallback, OnPermissionGrantedCallback {
     companion object {
         private const val LAST_KNOWN_ZOOM = "last_known_zoom"
         private const val LAST_KNOWN_LONGITUDE = "last_known_longitude"
@@ -119,7 +119,7 @@ class MapFragment : Fragment(), PhotoListener, OnMapReadyCallback, SetOnPopUpWin
 
         refreshFab.setOnClickListener {
             if (currentView != null && mapAdapter.map != null) {
-                Snackbar.make(it, "loading locations...", Snackbar.LENGTH_SHORT).show()
+                com.google.android.material.snackbar.Snackbar.make(it, "loading locations...", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
                 map.clear()
                 pinViewModel.loadPinData()
                 mapAdapter.bindMarkers()
