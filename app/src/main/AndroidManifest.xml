@@ -44,10 +44,9 @@
             android:screenOrientation="portrait"/>
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="com.android.fileprovider"
+            android:authorities="${applicationId}.fileprovider"
             android:grantUriPermissions="true"
-            android:exported="false"
-            tools:replace="android:authorities">
+            android:exported="false">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_provider_paths"

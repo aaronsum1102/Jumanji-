@@ -54,7 +54,7 @@ interface OnPermissionGrantedCallback {
     fun actionWithPermission(context: Context)
 }
 
-class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyCallback, SetOnPopUpWindowAdapter, OnUrlAvailableCallback, OnPermissionGrantedCallback {
+class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyCallback, SetOnPopUpWindowAdapter {
     companion object {
         private const val LAST_KNOWN_ZOOM = "last_known_zoom"
         private const val LAST_KNOWN_LONGITUDE = "last_known_longitude"
@@ -63,7 +63,6 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
         private const val RESTORE_STATE_FLAG = "restore_state_flag"
         private const val LOCATION_REQUEST_CODE = 300
         private const val REQUEST_CAMERA_CODE = 100
-        private const val SELECT_FILE_CODE = 200
         private const val REQUEST_SETTING_CHECK = 30
     }
 
@@ -322,19 +321,6 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
         }
     }
 
-    override fun actionWithPermission(context: Context) {
-        when (userChoosenTask) {
-            "Take Photo" -> {
-                locationViewModel.startLocationUpdates(context)
-                cameraIntent()
-            }
-
-            "Choose from Library" -> {
-                galleryIntent()
-            }
-        }
-    }
-
     override fun selectImage() {
         val context = this@MapFragment.context
         if (context != null) {
@@ -345,12 +331,12 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                 when {
                     items[item] == "Take Photo" -> {
                         userChoosenTask = "Take Photo"
-                        UtilityCamera.checkPermission(this, context, this)
+                        UtilCamera.checkPermissionBeforeAction(this, context)
                     }
 
                     items[item] == "Choose from Library" -> {
                         userChoosenTask = "Choose from Library"
-                        UtilityCamera.checkPermission(this, context, this)
+                        UtilCamera.checkPermissionBeforeAction(this, context)
                     }
 
                     items[item] == "Cancel" -> dialog.dismiss()
@@ -373,16 +359,22 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                 }
             }
 
-            UtilityCamera.PERMISSIONS_TO_READ_EXTERNAL_STORAGE -> {
+            UtilCamera.PERMISSIONS_TO_READ_EXTERNAL_STORAGE -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     context?.let {
-                        actionWithPermission(it)
+                        when (userChoosenTask) {
+                            "Take Photo" -> {
+                                locationViewModel.startLocationUpdates(this.requireContext())
+                                cameraIntent()
+                            }
+
+                            "Choose from Library" -> {
+                                UtilCamera.chooseFromGallery(this)
+                            }
+                        }
                     }
                 } else {
-                    Toast.makeText(context,
-                            "Please give me the permission to access your storage, so that I can reporting trash.",
-                            Toast.LENGTH_LONG)
-                            .show()
+                    UtilCamera.displayToastForNoPermission(this)
                 }
             }
         }
@@ -392,6 +384,7 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
         super.onActivityResult(requestCode, resultCode, data)
         val photoRepository = PhotoRepository(email)
 
+        val context = this.context
         when (requestCode) {
             REQUEST_CAMERA_CODE -> {
                 locationViewModel.stopLocationUpdates()
@@ -402,39 +395,56 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                             "com.android.fileprovider",
                             photoFile)
                     data?.data = photoURI
-                    photoRepository.storePhotoToDatabase(photoURI, activity, this, true)
+                    photoRepository.storePhotoToDatabase(photoURI, activity)
                 }
             }
 
-            SELECT_FILE_CODE -> {
+            UtilCamera.SELECT_IMAGE_CODE -> {
                 if (resultCode == Activity.RESULT_OK && data != null) {
-                    photoRepository.storePhotoToDatabase(data.data, activity, this, true)
-                    val position = getLatLngFromPhoto(data)
-                    if (position?.latitude == 0.0 && position?.longitude == 0.0) {
-                        Toast.makeText(this@MapFragment.context,
-                                "No position available from photo",
-                                Toast.LENGTH_SHORT).show()
+                    val uri = data.data
+                    val photoExif = UtilCamera.getLatLngFromPicture(uri, this.requireContext())
+                    if (photoExif != null) {
+                        context?.let {
+                            val resizeImageFile = UtilCamera.resizeImage(uri, context)
+                            resizeImageFile?.let {
+                                val uriForUpload = UtilCamera.getUriForFile(it, context)
+                                Toast.makeText(context,
+                                        context.getString(R.string.uploadingPhoto),
+                                        Toast.LENGTH_SHORT)
+                                        .show()
+                                photoRepository.storePhotoToDatabase(uriForUpload, activity)
+                                        .addOnSuccessListener { uploadTask ->
+                                            Toast.makeText(context,
+                                                    context.getString(R.string.successUploadTrashPhoto),
+                                                    Toast.LENGTH_SHORT)
+                                                    .show()
+                                            uploadTask.storage.downloadUrl
+                                                    .addOnSuccessListener { downloadUrl ->
+                                                        resizeImageFile.delete()
+                                                        pinViewModel.reportPointForTrash(
+                                                                PinDataInfo(photoExif.long.toFloat(),
+                                                                        photoExif.lat.toFloat(),
+                                                                        photoExif.orientation,
+                                                                        downloadUrl.toString(),
+                                                                        username,
+                                                                        true)
+
+                                                        )
+                                                        profileViewModel.updateUserPinNumber(username)
+                                                        pinViewModel.loadPinData()
+                                                        profileViewModel.updateUserStatistics(username)
+                                                        statisticViewModel.updateCommunityStatistics(StatisticRepository.TOTAL_REPORTED_PINS)
+                                                    }
+                                        }
+                            }
+                        }
                     } else {
-                        Log.d("TAG", "lat lng of photo : $position")
+                        UtilCamera.warningForNoMetadataInPhoto(this.requireContext())
                     }
                 }
             }
         }
     }
-
-    override fun storeDataToFirebase(uri: Uri) {
-        pinViewModel.reportPointForTrash(PinDataInfo(
-                currentLocation.longitude.toFloat(),
-                currentLocation.latitude.toFloat(),
-                uri.toString(),
-                username,
-                true))
-        profileViewModel.updateUserPinNumber(username)
-        pinViewModel.loadPinData()
-        profileViewModel.updateUserStatistics(username)
-        statisticViewModel.updateCommunityStatistics(StatisticRepository.TOTAL_REPORTED_PINS)
-    }
-
 
     private var mCurrentPhotoPath: String = ""
 
@@ -476,42 +486,6 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
         // Save a file: path for use with ACTION_VIEW intents
         mCurrentPhotoPath = imageFile.absolutePath
         return imageFile
-    }
-
-    private fun galleryIntent() {
-        val intent = Intent()
-        intent.type = "image/*"
-        intent.action = Intent.ACTION_GET_CONTENT
-        startActivityForResult(Intent.createChooser(intent, "Select File"), SELECT_FILE_CODE)
-    }
-
-    private fun getLatLngFromPhoto(data: Intent): LatLng? {
-        val uri = data.data
-        var cursor = this@MapFragment.context!!.contentResolver.query(
-                uri,
-                null,
-                null,
-                null,
-                null)
-        cursor.moveToFirst()
-        val columnIndexOfDisplayName = 2
-        val fileName = cursor.getString(columnIndexOfDisplayName)
-        cursor.close()
-        val selection = "${MediaStore.Images.ImageColumns.DISPLAY_NAME}='$fileName'"
-        cursor = this@MapFragment.context!!.contentResolver.query(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                arrayOf(MediaStore.Images.Media.LATITUDE,
-                        MediaStore.Images.Media.LONGITUDE),
-                selection,
-                null,
-                null)
-        var metaData: LatLng? = null
-        if (cursor.count == 1) {
-            cursor.moveToFirst()
-            metaData = LatLng(cursor.getDouble(0), cursor.getDouble(1))
-        }
-        cursor.close()
-        return metaData
     }
 
     class GoogleMapAdapter {

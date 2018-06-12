@@ -1,11 +1,11 @@
 package jumanji.sda.com.jumanji
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.room.*
 import androidx.room.OnConflictStrategy.REPLACE
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import io.reactivex.Single
@@ -15,6 +15,7 @@ import io.reactivex.schedulers.Schedulers
 
 data class PinDataInfo(val longitude: Float = 0.0f,
                        val latitude: Float = 0.0f,
+                       val orientation: String = "0",
                        val imageURL: String = "",
                        val username: String = "",
                        val isTrash: Boolean = true)

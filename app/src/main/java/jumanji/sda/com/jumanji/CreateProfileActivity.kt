@@ -75,7 +75,7 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
                 profileViewModel.saveUserProfile(profile, this, this)
 
                 Toast.makeText(this, "creating your profile now...", Toast.LENGTH_SHORT).show()
-                photoRepository.storePhotoToDatabase(uriString, this, this, false)
+                photoRepository.storePhotoToDatabase(uriString, this)
 
                 saveButton.isEnabled = false
             } else {
@@ -107,12 +107,12 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
             when (items[item]) {
                 "Take Photo" -> {
                     userChoosenTask = "Take Photo"
-                    UtilityCamera.checkPermission(context = this@CreateProfileActivity, callback = this)
+                    UtilCamera.checkPermissionBeforeAction(context = this@CreateProfileActivity)
                 }
 
                 "Choose from Library" -> {
                     userChoosenTask = "Choose from Library"
-                    UtilityCamera.checkPermission(context = this@CreateProfileActivity, callback = this)
+                    UtilCamera.checkPermissionBeforeAction(context = this@CreateProfileActivity)
                 }
 
                 "Cancel" -> dialog.dismiss()
@@ -142,7 +142,7 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         when (requestCode) {
-            UtilityCamera.PERMISSIONS_TO_READ_EXTERNAL_STORAGE ->
+            UtilCamera.PERMISSIONS_TO_READ_EXTERNAL_STORAGE ->
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     actionWithPermission(this)
                 } else {

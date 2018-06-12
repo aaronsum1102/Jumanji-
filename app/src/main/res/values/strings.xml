@@ -34,4 +34,8 @@
     <string name="permissionPositiveStorage">Acknowledge</string>
     <string name="snackbarNoStorageAction">Give permission</string>
     <string name="snackbarNoStoragePermission">Give give me storage permission for full functionality of the app.</string>
+    <string name="imageChooserTitle">Select Image</string>
+    <string name="noPositionMetaData">No position data available from selected photo.</string>
+    <string name="uploadingPhoto">Uploading your photo now.</string>
+    <string name="successUploadTrashPhoto">Thanks for reporting trash location.</string>
 </resources>
