@@ -15,6 +15,30 @@
       },
       "oauth_client": [
         {
+          "client_id": "103680044083-sh2lachmvngt84e659f10aut13k1hmh7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "jumanji.sda.com.jumanji",
+            "certificate_hash": "28ab0fcbf2809afc4d2030cbe77ab3bc27acabd4"
+          }
+        },
+        {
+          "client_id": "103680044083-9rmbvnik5vb9795bea331nvgp5e5br43.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "jumanji.sda.com.jumanji",
+            "certificate_hash": "cdaee4b10a373de5c5f8c86c51cd2be9d11f538a"
+          }
+        },
+        {
+          "client_id": "103680044083-98gjgjj8ru69veqa6gu0gsem3prsrmpi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "jumanji.sda.com.jumanji",
+            "certificate_hash": "7bb28dcdeceaf5d705b7060860ec4238872803d5"
+          }
+        },
+        {
           "client_id": "103680044083-7gbie85l5qgcvou53dsh05j5td75mrrg.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -69,6 +93,10 @@
             "package_name": "jumanji.sda.com.jumanji",
             "certificate_hash": "4c011a8afd3f61ee003315eb2686654b43ccc1ab"
           }
+        },
+        {
+          "client_id": "103680044083-t5s5b5tmo3dbec760ajl2c7n16e1p9i4.apps.googleusercontent.com",
+          "client_type": 3
         },
         {
           "client_id": "103680044083-t5s5b5tmo3dbec760ajl2c7n16e1p9i4.apps.googleusercontent.com",

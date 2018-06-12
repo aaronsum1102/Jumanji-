@@ -2,8 +2,6 @@ package jumanji.sda.com.jumanji
 
 import android.Manifest
 import android.app.Activity
-import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModelProviders
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
@@ -12,11 +10,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import com.google.android.material.snackbar.Snackbar
-import androidx.core.app.ActivityCompat
-import androidx.fragment.app.Fragment
-import androidx.core.content.FileProvider
-import androidx.appcompat.app.AlertDialog
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -26,6 +19,11 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.PopupWindow
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.core.app.ActivityCompat
+import androidx.core.content.FileProvider
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProviders
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.LocationSettingsStatusCodes
@@ -36,12 +34,13 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.Marker
+import com.google.android.material.snackbar.Snackbar
 import com.squareup.picasso.Picasso
 import kotlinx.android.synthetic.main.fragment_map.*
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
-import java.util.Date
+import java.util.*
 
 interface SetOnPopUpWindowAdapter {
     fun displayPopUpWindow(marker: Marker)
@@ -119,13 +118,12 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
 
         refreshFab.setOnClickListener {
             if (currentView != null && mapAdapter.map != null) {
-                com.google.android.material.snackbar.Snackbar.make(it, "loading locations...", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+                Snackbar.make(it, "loading locations...", Snackbar.LENGTH_SHORT).show()
                 map.clear()
                 pinViewModel.loadPinData()
                 mapAdapter.bindMarkers()
             }
         }
-
         reportFab.setOnClickListener {
             selectImage()
         }
@@ -347,12 +345,12 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                 when {
                     items[item] == "Take Photo" -> {
                         userChoosenTask = "Take Photo"
-                        Utility.checkPermission(this, context, this)
+                        UtilityCamera.checkPermission(this, context, this)
                     }
 
                     items[item] == "Choose from Library" -> {
                         userChoosenTask = "Choose from Library"
-                        Utility.checkPermission(this, context, this)
+                        UtilityCamera.checkPermission(this, context, this)
                     }
 
                     items[item] == "Cancel" -> dialog.dismiss()
@@ -375,7 +373,7 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                 }
             }
 
-            Utility.MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE -> {
+            UtilityCamera.PERMISSIONS_TO_READ_EXTERNAL_STORAGE -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     context?.let {
                         actionWithPermission(it)

@@ -29,4 +29,9 @@
     <string name="cleared">Cleared</string>
     <string name="edit_profile">Edit Profile</string>
     <string name="delete_profile">Delete Profile</string>
+    <string name="permissionTitleStorage">Permission is required</string>
+    <string name="permissionContentStorage">Storage permission is necessary to get photo for reporting trash location and your profile photo.</string>
+    <string name="permissionPositiveStorage">Acknowledge</string>
+    <string name="snackbarNoStorageAction">Give permission</string>
+    <string name="snackbarNoStoragePermission">Give give me storage permission for full functionality of the app.</string>
 </resources>

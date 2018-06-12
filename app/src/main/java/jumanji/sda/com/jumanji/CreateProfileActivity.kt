@@ -107,12 +107,12 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
             when (items[item]) {
                 "Take Photo" -> {
                     userChoosenTask = "Take Photo"
-                    Utility.checkPermission(context = this@CreateProfileActivity, callback = this)
+                    UtilityCamera.checkPermission(context = this@CreateProfileActivity, callback = this)
                 }
 
                 "Choose from Library" -> {
                     userChoosenTask = "Choose from Library"
-                    Utility.checkPermission(context = this@CreateProfileActivity, callback = this)
+                    UtilityCamera.checkPermission(context = this@CreateProfileActivity, callback = this)
                 }
 
                 "Cancel" -> dialog.dismiss()
@@ -142,7 +142,7 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         when (requestCode) {
-            Utility.MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE ->
+            UtilityCamera.PERMISSIONS_TO_READ_EXTERNAL_STORAGE ->
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     actionWithPermission(this)
                 } else {
