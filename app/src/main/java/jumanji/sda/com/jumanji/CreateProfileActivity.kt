@@ -60,7 +60,9 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
                 val photoRepository = PhotoRepository(email)
                 Toast.makeText(this, "creating your profile now...", Toast.LENGTH_SHORT).show()
                 if (this::profilePhotoUri.isInitialized) {
-                    val orientationFromPhoto = UtilCamera.getOrientationFromPhoto(profilePhotoUri, applicationContext)
+                    val orientationFromPhoto = UtilCamera.getMetadataFromPhoto(profilePhotoUri,
+                            applicationContext)
+                            .orientation
                     val resizeImage = UtilCamera.resizeImage(profilePhotoUri, applicationContext)
                     resizeImage?.let {
                         val internalUri = UtilCamera.getUriForFile(resizeImage, applicationContext)
@@ -149,7 +151,8 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
                     uri?.let {
                         profilePhotoUri = uri
                         try {
-                            val orientationFromPhoto = UtilCamera.getOrientationFromPhoto(uri, applicationContext)?.toInt()
+                            val orientationFromPhoto = UtilCamera.getMetadataFromPhoto(uri,
+                                    applicationContext).orientation?.toInt()
                             orientationFromPhoto?.let {
                                 UtilCamera.loadPhotoIntoView(uri, orientationFromPhoto, profilePhoto)
                             }

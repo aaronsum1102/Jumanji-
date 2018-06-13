@@ -8,8 +8,6 @@ import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -21,7 +19,7 @@ import android.widget.PopupWindow
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
-import androidx.core.content.FileProvider
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
 import com.google.android.gms.common.api.ApiException
@@ -38,15 +36,12 @@ import com.google.android.material.snackbar.Snackbar
 import com.squareup.picasso.Picasso
 import kotlinx.android.synthetic.main.fragment_map.*
 import java.io.File
-import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.*
 
 interface SetOnPopUpWindowAdapter {
     fun displayPopUpWindow(marker: Marker)
 }
 
-class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyCallback, SetOnPopUpWindowAdapter {
+class MapFragment : Fragment(), OnMapReadyCallback, SetOnPopUpWindowAdapter {
     companion object {
         private const val LAST_KNOWN_ZOOM = "last_known_zoom"
         private const val LAST_KNOWN_LONGITUDE = "last_known_longitude"
@@ -70,6 +65,7 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
     private lateinit var mapAdapter: GoogleMapAdapter
     private var email: String = ""
     private var username: String = ""
+    private var photo: File? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         return inflater.inflate(R.layout.fragment_map, container, false)
@@ -115,7 +111,7 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
             }
         }
         reportFab.setOnClickListener {
-            selectImage()
+            createDialogForAction()
         }
     }
 
@@ -312,7 +308,7 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
         }
     }
 
-    override fun selectImage() {
+    private fun createDialogForAction() {
         val context = this@MapFragment.context
         if (context != null) {
             val items = arrayOf("Take Photo", "Choose from Library", "Cancel")
@@ -322,14 +318,13 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                 when {
                     items[item] == "Take Photo" -> {
                         userChoosenTask = "Take Photo"
-                        UtilCamera.checkPermissionBeforeAction(this, context)
+                        locationViewModel.startLocationUpdates(context)
+                        photo = UtilCamera.useCamera(context, this@MapFragment)
                     }
-
                     items[item] == "Choose from Library" -> {
                         userChoosenTask = "Choose from Library"
                         UtilCamera.checkPermissionBeforeAction(this, context)
                     }
-
                     items[item] == "Cancel" -> dialog.dismiss()
                 }
             })
@@ -353,20 +348,7 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
             UtilCamera.PERMISSIONS_TO_READ_EXTERNAL_STORAGE -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     context?.let {
-                        when (userChoosenTask) {
-                            "Take Photo" -> {
-                                locationViewModel.startLocationUpdates(it)
-                                cameraIntent()
-                            }
-
-                            "Choose from Library" -> {
-                                this@MapFragment.context?.let {
-                                    UtilCamera.chooseFromGallery(this@MapFragment, it)
-                                }
-                            }
-                            else -> {
-                            }
-                        }
+                        UtilCamera.chooseFromGallery(this@MapFragment, it)
                     }
                 } else {
                     this@MapFragment.context?.let {
@@ -383,15 +365,16 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
         val context = this.context
         when (requestCode) {
             UtilCamera.USE_CAMERA_CODE -> {
-                locationViewModel.stopLocationUpdates()
                 if (resultCode == Activity.RESULT_OK) {
-                    val photoFile = File(mCurrentPhotoPath)
-                    // Continue only if the File was successfully created
-                    val photoURI: Uri = FileProvider.getUriForFile(context!!,
-                            "com.android.fileprovider",
-                            photoFile)
-                    data?.data = photoURI
-                    photoRepository.storePhotoToDatabase(photoURI, activity)
+                    context?.let {
+                        photo?.let {
+                            val photoUri = UtilCamera.getUriForFile(it, context)
+                            // TODO compare gps and exif location data, currently using photo location.
+                            val photoExif = UtilCamera.getMetadataFromPhoto(photoUri, context)
+                            uploadPhoto(photoUri, photoExif, photoRepository)
+                            locationViewModel.stopLocationUpdates()
+                        }
+                    }
                 }
             }
 
@@ -399,33 +382,45 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     val uri = data.data
                     val photoExif = UtilCamera.getMetadataFromPhoto(uri, this.requireContext())
-                    if (photoExif != null) {
-                        context?.let {
-                            val resizeImageFile = UtilCamera.resizeImage(uri, context)
-                            resizeImageFile?.let {
-                                val uriForUpload = UtilCamera.getUriForFile(it, context)
-                                notifyUploadingOfPhoto(context)
-                                photoRepository.storePhotoToDatabase(uriForUpload, activity)
-                                        .addOnSuccessListener { uploadTask ->
+                    uploadPhoto(uri, photoExif, photoRepository)
+                }
+            }
+        }
+    }
+
+    private fun uploadPhoto(uri: Uri, photoExif: PhotoExif, photoRepository: PhotoRepository) {
+        val (orientation, lat, long) = photoExif
+        if (orientation != null && lat != null && long != null) {
+            context?.let { context ->
+                val resizeImageFile = UtilCamera.resizeImage(uri, context)
+                resizeImageFile?.let {
+                    val uriForUpload = UtilCamera.getUriForFile(it, context)
+                    notifyUploadingOfPhoto(context)
+                    photoRepository.storePhotoToDatabase(uriForUpload, activity)
+                            .continueWith { uploadTask ->
+                                uploadTask.result.storage.downloadUrl
+                                        .addOnSuccessListener { downloadUrl ->
+                                            resizeImageFile.delete()
+                                            photo?.let { it.delete() }
+                                            updatePinData(downloadUrl, photoExif)
+                                            profileViewModel.updateUserPinNumber(username)
+                                            pinViewModel.loadPinData()
+                                            profileViewModel.updateUserStatistics(username)
+                                            statisticViewModel.updateCommunityStatistics(StatisticRepository.TOTAL_REPORTED_PINS)
                                             notifySuccessUploadOfPhoto(context)
-                                            uploadTask.storage.downloadUrl
-                                                    .addOnSuccessListener { downloadUrl ->
-                                                        resizeImageFile.delete()
-                                                        updatePinData(downloadUrl, photoExif)
-                                                        profileViewModel.updateUserPinNumber(username)
-                                                        pinViewModel.loadPinData()
-                                                        profileViewModel.updateUserStatistics(username)
-                                                        statisticViewModel.updateCommunityStatistics(StatisticRepository.TOTAL_REPORTED_PINS)
-                                                    }
+                                        }
+                                        .addOnFailureListener {
+                                            Toast.makeText(context,
+                                                    "Something went wrong when uploading photo.",
+                                                    Toast.LENGTH_SHORT).show()
+                                            Log.e("UploadPhoto", "error upload photo.${it.message}")
                                         }
                             }
-                        }
-                    } else {
-                        this@MapFragment.context?.let {
-                            UtilCamera.warningForNoMetadataInPhoto(it)
-                        }
-                    }
                 }
+            }
+        } else {
+            this@MapFragment.context?.let {
+                UtilCamera.warningForNoMetadataInPhoto(it)
             }
         }
     }
@@ -445,55 +440,17 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
     }
 
     private fun updatePinData(downloadUrl: Uri, photoExif: PhotoExif) {
-        pinViewModel.reportPointForTrash(
-                PinDataInfo(photoExif.long.toFloat(),
-                        photoExif.lat.toFloat(),
-                        photoExif.orientation,
-                        downloadUrl.toString(),
-                        username,
-                        true))
-    }
-
-    private var mCurrentPhotoPath: String = ""
-
-
-    private fun cameraIntent() {
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (intent.resolveActivity(context?.packageManager) != null) {
-            try {
-                val photoFile: File = createImageFile()
-                // Continue only if the File was successfully created
-                val photoURI: Uri = FileProvider.getUriForFile(context!!,
-                        "com.android.fileprovider",
-                        photoFile)
-                intent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
-                intent.putExtra("return-data", true)
-                startActivityForResult(intent, UtilCamera.USE_CAMERA_CODE)
-            } catch (ex: IOException) {
-                // Error occurred while creating the File
-                Log.e(ex.message, ex.toString())
-            }
+        if (photoExif.lat != null &&
+                photoExif.long != null &&
+                photoExif.orientation != null) {
+            pinViewModel.reportPointForTrash(
+                    PinDataInfo(photoExif.long.toFloat(),
+                            photoExif.lat.toFloat(),
+                            photoExif.orientation,
+                            downloadUrl.toString(),
+                            username,
+                            true))
         }
-    }
-
-    private fun createImageFile(): File {
-        // Create an image file name
-        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        val imageFileName: String = "JPEG_" + timeStamp + "_"
-        val storageDir = Environment.getExternalStoragePublicDirectory(Environment.MEDIA_SHARED)
-
-        if (!storageDir.isDirectory)
-            storageDir.mkdir()
-
-        val imageFile = File.createTempFile(
-                imageFileName, /* prefix */
-                ".jpg", /* suffix */
-                storageDir     /* directory */
-        )
-
-        // Save a file: path for use with ACTION_VIEW intents
-        mCurrentPhotoPath = imageFile.absolutePath
-        return imageFile
     }
 
     class GoogleMapAdapter {

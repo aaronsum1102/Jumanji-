@@ -24,9 +24,9 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 
-data class PhotoExif(val orientation: String,
-                     val lat: Double,
-                     val long: Double)
+data class PhotoExif(val orientation: String?,
+                     val lat: Double?,
+                     val long: Double?)
 
 object UtilCamera {
     const val PERMISSIONS_TO_READ_EXTERNAL_STORAGE = 100
@@ -103,24 +103,13 @@ object UtilCamera {
         }
     }
 
-    fun getOrientationFromPhoto(uri: Uri, context: Context): String? {
-        val inputStream = context.contentResolver.openInputStream(uri)
-        val exif = ExifInterface(inputStream)
-        return exif.getAttribute(ExifInterface.TAG_ORIENTATION)
-    }
-
-    fun getMetadataFromPhoto(uri: Uri, context: Context): PhotoExif? {
+    fun getMetadataFromPhoto(uri: Uri, context: Context): PhotoExif {
         val inputStream = context.contentResolver.openInputStream(uri)
         val exif = ExifInterface(inputStream)
         val orientation = exif.getAttribute(ExifInterface.TAG_ORIENTATION)
         val latitude = exif.latLong?.get(0)
         val longitude = exif.latLong?.get(1)
-        if (orientation != null &&
-                latitude != null &&
-                longitude != null) {
-            return PhotoExif(orientation, latitude, longitude)
-        }
-        return null
+        return PhotoExif(orientation, latitude, longitude)
     }
 
     fun warningForNoMetadataInPhoto(context: Context) {
@@ -150,9 +139,15 @@ object UtilCamera {
                 arrayOf(MediaStore.Images.Media.DATA),
                 null, null, null)
         cursor.moveToFirst()
-        val path = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA))
-        cursor.close()
-        return BitmapFactory.decodeFile(path)
+        return if (cursor.columnCount != 0) {
+            val path = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA))
+            cursor.close()
+            BitmapFactory.decodeFile(path)
+        } else {
+            cursor.close()
+            val inputStream = context.contentResolver.openInputStream(uri)
+            BitmapFactory.decodeStream(inputStream)
+        }
     }
 
     private fun createImageFIle(context: Context): File? {
@@ -187,5 +182,24 @@ object UtilCamera {
                 Picasso.get().load(uri).into(imageView)
             }
         }
+    }
+
+    fun useCamera(context: Context, fragment: Fragment?): File? {
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        if (intent.resolveActivity(context.packageManager) != null) {
+            val photoFile = createImageFIle(context)
+            photoFile?.let {
+                val uri = getUriForFile(photoFile, context)
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, uri)
+                intent.putExtra("return-data", true)
+                if (fragment != null) {
+                    fragment.startActivityForResult(intent, UtilCamera.USE_CAMERA_CODE)
+                } else {
+                    (context as Activity).startActivityForResult(intent, UtilCamera.USE_CAMERA_CODE)
+                }
+                return photoFile
+            }
+        }
+        return null
     }
 }

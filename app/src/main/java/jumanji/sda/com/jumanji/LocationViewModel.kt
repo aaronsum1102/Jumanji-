@@ -75,7 +75,9 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun stopLocationUpdates() {
-        fusedLocationProviderClient.removeLocationUpdates(locationCallback)
+        if (this::locationCallback.isInitialized) {
+            fusedLocationProviderClient.removeLocationUpdates(locationCallback)
+        }
     }
 
     fun moveToLastKnowLocation(map: GoogleMap, zoomLevel: Float = DEFAULT_ZOOM_LEVEL) {
@@ -86,7 +88,6 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
                     val location = LatLng(it.latitude, it.longitude)
                     map.animateCamera(CameraUpdateFactory.newLatLngZoom(location, zoomLevel),
                             500, null)
-
                 }
             }
         }
