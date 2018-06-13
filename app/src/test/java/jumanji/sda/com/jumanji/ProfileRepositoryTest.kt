@@ -18,11 +18,9 @@ class ProfileRepositoryTest {
     @Test
     fun saveToDatabese() {
 
-        val profileRepository: ProfileRepository = ProfileRepository()
 
         val testUserProfile: UserProfile = UserProfile("Aaron", "aaron@gmai.com", "www.picture.com")
 
-        profileRepository.storeToDatabase(testUserProfile)
 
     }
 }

@@ -1,8 +1,6 @@
 package jumanji.sda.com.jumanji
 
 import android.app.Activity
-import androidx.lifecycle.ViewModelProviders
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -10,28 +8,20 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProviders
 import kotlinx.android.synthetic.main.activity_create_profile.*
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.FileOutputStream
-import java.io.IOException
+import java.io.*
 
 interface OnNewUserRegisteredCallback {
     fun onProfileSaveToFirebase()
 }
 
-class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, OnUrlAvailableCallback, OnNewUserRegisteredCallback, OnPermissionGrantedCallback {
-
-    override fun storeDataToFirebase(uri: Uri) {
-    }
-
+class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, OnNewUserRegisteredCallback {
     companion object {
         private const val REQUEST_CAMERA = 100
         private const val SELECT_FILE = 200
@@ -40,7 +30,7 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
     val profileViewModel by lazy { ViewModelProviders.of(this)[ProfileViewModel::class.java] }
     var userChoosenTask: String = ""
 
-    private var uriString: Uri = Uri.parse("android.resource://jumanji.sda.com.jumanji/" + R.drawable.download)
+    private lateinit var profilePhotoUri: Uri
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,8 +40,6 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
         val email = profileViewModel.userInfo?.value?.email
 
         if (username != "null") userNameField.setText(username)
-        passwordField.setText(profileViewModel.userInfo?.value?.password)
-        confirmPasswordField.setText(profileViewModel.userInfo?.value?.password)
         if (email != "null") emailField.setText(email)
 
         saveButton.isEnabled = false
@@ -70,13 +58,26 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
                 val email = emailField.text.toString()
                 val password = passwordField.text.toString()
                 val photoRepository = PhotoRepository(email)
-
-                val profile = UserProfile(userName, password, email, uriString?.toString())
-                profileViewModel.saveUserProfile(profile, this, this)
-
                 Toast.makeText(this, "creating your profile now...", Toast.LENGTH_SHORT).show()
-                photoRepository.storePhotoToDatabase(uriString, this)
-
+                if (this::profilePhotoUri.isInitialized) {
+                    val orientationFromPhoto = UtilCamera.getOrientationFromPhoto(profilePhotoUri, applicationContext)
+                    val resizeImage = UtilCamera.resizeImage(profilePhotoUri, applicationContext)
+                    resizeImage?.let {
+                        val internalUri = UtilCamera.getUriForFile(resizeImage, applicationContext)
+                        val profile = UserProfile(userName, email, internalUri.toString())
+                        profileViewModel.saveUserProfile(profile, password, this, this)
+                                .continueWith {
+                                    val newProfile = profile.copy(userId = it.result.user.uid)
+                                    photoRepository.storePhotoToDatabase(internalUri, this)
+                                            .addOnSuccessListener { uploadTask ->
+                                                uploadTask.storage.downloadUrl
+                                                        .addOnSuccessListener {
+                                                            profileViewModel.storeProfileDataToDB(newProfile)
+                                                        }
+                                            }
+                                }
+                    }
+                }
                 saveButton.isEnabled = false
             } else {
                 Toast.makeText(this@CreateProfileActivity,
@@ -126,65 +127,40 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
         startActivityForResult(intent, REQUEST_CAMERA)
     }
 
-    private fun galleryIntent() {
-        val intent = Intent()
-        intent.type = "image/*"
-        intent.action = Intent.ACTION_GET_CONTENT
-        startActivityForResult(Intent.createChooser(intent, "Select File"), SELECT_FILE)
-    }
-
-    override fun actionWithPermission(context: Context) {
-        when (userChoosenTask) {
-            "Take Photo" -> cameraIntent()
-            "Choose from Library" -> galleryIntent()
-        }
-    }
-
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         when (requestCode) {
             UtilCamera.PERMISSIONS_TO_READ_EXTERNAL_STORAGE ->
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    actionWithPermission(this)
+                    UtilCamera.chooseFromGallery(null, applicationContext)
                 } else {
-                    Toast.makeText(this,
-                            "I need your permission to show you a nice profile picture",
-                            Toast.LENGTH_LONG)
-                            .show()
+                    UtilCamera.displayMessageForNoPermission(null, applicationContext)
                 }
         }
     }
 
     public override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        when (requestCode) {
-            SELECT_FILE -> {
-                if (resultCode == Activity.RESULT_OK) {
-                    onSelectFromGalleryResult(data)
-                }
-            }
+        if (resultCode == Activity.RESULT_OK) {
+            val uri = data?.data
+            when (requestCode) {
+                SELECT_FILE -> {
+                    uri?.let {
+                        profilePhotoUri = uri
+                        try {
+                            val orientationFromPhoto = UtilCamera.getOrientationFromPhoto(uri, applicationContext)?.toInt()
+                            orientationFromPhoto?.let {
+                                UtilCamera.loadPhotoIntoView(uri, orientationFromPhoto, profilePhoto)
+                            }
 
-            REQUEST_CAMERA -> {
-                if (resultCode == Activity.RESULT_OK) {
+                        } catch (exception: NumberFormatException) {
+                        }
+                    }
+                }
+                REQUEST_CAMERA -> {
                     onCaptureImageResult(data)
                 }
             }
         }
-    }
-
-    private fun onSelectFromGalleryResult(data: Intent?) {
-
-        var bm: Bitmap? = null
-        if (data != null) {
-            try {
-                bm = MediaStore.Images.Media.getBitmap(applicationContext.contentResolver, data.data)
-                uriString = data.data
-            } catch (e: IOException) {
-                e.printStackTrace()
-            }
-        }
-
-        profilePhoto.setImageBitmap(bm)
-        Log.d(javaClass.simpleName, "Setting image to profile.")
     }
 
     private fun onCaptureImageResult(data: Intent?) {
@@ -206,7 +182,7 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
         }
 
         profilePhoto.setImageBitmap(thumbnail)
-        uriString = Uri.fromFile(destination.absoluteFile)
+        profilePhotoUri = Uri.fromFile(destination.absoluteFile)
     }
 
     override fun onProfileSaveToFirebase() {

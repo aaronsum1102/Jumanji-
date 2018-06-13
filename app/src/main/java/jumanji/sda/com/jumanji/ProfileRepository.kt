@@ -1,12 +1,14 @@
 package jumanji.sda.com.jumanji
 
-import androidx.lifecycle.MutableLiveData
 import android.content.Context
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.lifecycle.MutableLiveData
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.tasks.Task
+import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
@@ -14,9 +16,9 @@ import java.util.*
 
 data class UserProfile(
         val userName: String = "",
-        val password: String = "",
         val email: String = "",
-        val photoURL: String = ""
+        val photoURL: String = "",
+        val userId: String = ""
 )
 
 class ProfileRepository(context: Context) {
@@ -42,7 +44,6 @@ class ProfileRepository(context: Context) {
             if (key == PREFERENCE_NAME) {
                 val user = UserProfile(
                         userNameSharedPref.getString(KEY_USER_NAME, ""),
-                        userNameSharedPref.getString(KEY_PASSWORD, ""),
                         userNameSharedPref.getString(KEY_EMAIL, ""),
                         userNameSharedPref.getString(KEY_PHOTO_URL, "")
                 )
@@ -57,34 +58,25 @@ class ProfileRepository(context: Context) {
         val currentUser = userAuthentication.currentUser
         if (currentUser != null) {
             val userProfile = UserProfile(currentUser.displayName.toString(),
-                    "",
                     currentUser.email.toString(),
                     currentUser.photoUrl.toString())
             userInfo.value = userProfile
         } else {
             val acct = GoogleSignIn.getLastSignedInAccount(context)
             userInfo.value = UserProfile(acct?.givenName.toString(),
-                    "",
                     acct?.email.toString(),
                     acct?.photoUrl.toString())
         }
     }
 
-    fun storeToDatabase(userProfile: UserProfile) {
-        if (userProfile.email.isEmpty()) return
-        //TODO notify user that email is obligatory
-
-        val user: HashMap<String, Any> = HashMap()
-        user.put("userName", userProfile.userName)
-        user.put("email", userProfile.email)
-        user.put("pictureURI", userProfile.photoURL)
-
-        database.collection("userProfiles").document(userProfile.email)
-                .set(user)
+    fun storeProfileInfoToDB(userProfile: UserProfile) {
+        userInfo.postValue(userProfile)
+        database.collection(userProfile.userId).document("userInfo").set(userProfile)
     }
 
-    fun createNewUser(userProfile: UserProfile, callback: OnNewUserRegisteredCallback, context: Context) {
-        userAuthentication.createUserWithEmailAndPassword(userProfile.email, userProfile.password)
+    fun createNewUser(userProfile: UserProfile, password: String, callback: OnNewUserRegisteredCallback, context: Context): Task<AuthResult> {
+        val taskCreateAccount = userAuthentication.createUserWithEmailAndPassword(userProfile.email, password)
+        taskCreateAccount
                 .addOnCompleteListener({ task ->
                     if (task.isSuccessful) {
                         // Sign in success, update UI with the signed-in user's information
@@ -94,10 +86,10 @@ class ProfileRepository(context: Context) {
                     } else {
                         Toast.makeText(context, "${task.exception?.message}", Toast.LENGTH_SHORT)
                                 .show()
-                        // If sign in fails, display a message to the user.
                         Log.d(TAG, "createUserWithEmail:failure", task.getException());
                     }
                 })
+        return taskCreateAccount
     }
 
     fun updateUserInformation(userProfile: UserProfile, callback: OnNewUserRegisteredCallback) {

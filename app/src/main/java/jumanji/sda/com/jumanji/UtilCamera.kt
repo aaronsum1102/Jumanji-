@@ -9,7 +9,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.MediaStore
+import android.widget.ImageView
 import android.widget.Toast
+import androidx.annotation.LayoutRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -17,6 +19,7 @@ import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import androidx.fragment.app.Fragment
 import com.google.android.material.snackbar.Snackbar
+import com.squareup.picasso.Picasso
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -28,6 +31,7 @@ data class PhotoExif(val orientation: String,
 object UtilCamera {
     const val PERMISSIONS_TO_READ_EXTERNAL_STORAGE = 100
     const val SELECT_IMAGE_CODE = 200
+    const val USE_CAMERA_CODE = 201
     private val permissions = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
 
     fun checkPermissionBeforeAction(fragment: Fragment? = null, context: Context) {
@@ -39,9 +43,7 @@ object UtilCamera {
                 requestForPermission(fragment, context)
             }
         } else {
-            fragment?.let {
-                chooseFromGallery(fragment)
-            }
+            chooseFromGallery(fragment, context)
         }
     }
 
@@ -55,7 +57,7 @@ object UtilCamera {
                 })
                 .setNegativeButton(android.R.string.cancel) { dialog, _ ->
                     dialog.dismiss()
-                    displayToastForNoPermission(fragment)
+                    displayMessageForNoPermission(fragment, context)
                 }
                 .create()
                 .show()
@@ -73,31 +75,41 @@ object UtilCamera {
         }
     }
 
-    fun displayToastForNoPermission(fragment: Fragment?) {
+    fun displayMessageForNoPermission(fragment: Fragment?, context: Context) {
         fragment?.let {
-            fragment.view?.let {
-                Snackbar.make(it,
-                        fragment.requireContext().getString(R.string.snackbarNoStoragePermission),
+            fragment.view?.let { view ->
+                Snackbar.make(view,
+                        context.getString(R.string.snackbarNoStoragePermission),
                         Snackbar.LENGTH_LONG)
                         .setAction(fragment.requireContext().getString(R.string.snackbarNoStorageAction)) {
-                            requestForPermission(fragment, fragment.requireContext())
+                            requestForPermission(fragment, context)
                         }
                         .show()
             }
         }
     }
 
-    fun chooseFromGallery(fragment: Fragment) {
+    fun chooseFromGallery(fragment: Fragment?, context: Context) {
         val intent = Intent()
         intent.type = "image/*"
         intent.action = Intent.ACTION_PICK
         val chooser = Intent.createChooser(intent, "Select File")
-        if (chooser.resolveActivity(fragment.requireContext().packageManager) != null) {
-            fragment.startActivityForResult(chooser, SELECT_IMAGE_CODE)
+        if (chooser.resolveActivity(context.packageManager) != null) {
+            if (fragment == null) {
+                (context as Activity).startActivityForResult(chooser, SELECT_IMAGE_CODE)
+            } else {
+                fragment.startActivityForResult(chooser, SELECT_IMAGE_CODE)
+            }
         }
     }
 
-    fun getLatLngFromPicture(uri: Uri, context: Context): PhotoExif? {
+    fun getOrientationFromPhoto(uri: Uri, context: Context): String? {
+        val inputStream = context.contentResolver.openInputStream(uri)
+        val exif = ExifInterface(inputStream)
+        return exif.getAttribute(ExifInterface.TAG_ORIENTATION)
+    }
+
+    fun getMetadataFromPhoto(uri: Uri, context: Context): PhotoExif? {
         val inputStream = context.contentResolver.openInputStream(uri)
         val exif = ExifInterface(inputStream)
         val orientation = exif.getAttribute(ExifInterface.TAG_ORIENTATION)
@@ -158,5 +170,22 @@ object UtilCamera {
     fun getUriForFile(file: File, context: Context): Uri {
         val authority = "${context.packageName}.fileprovider"
         return FileProvider.getUriForFile(context, authority, file)
+    }
+
+    fun loadPhotoIntoView(uri: Uri, orientation: Int, @LayoutRes imageView: ImageView) {
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> {
+                Picasso.get().load(uri).rotate(90f).into(imageView)
+            }
+            ExifInterface.ORIENTATION_ROTATE_180 -> {
+                Picasso.get().load(uri).rotate(180f).into(imageView)
+            }
+            ExifInterface.ORIENTATION_ROTATE_270 -> {
+                Picasso.get().load(uri).rotate(270f).into(imageView)
+            }
+            else -> {
+                Picasso.get().load(uri).into(imageView)
+            }
+        }
     }
 }

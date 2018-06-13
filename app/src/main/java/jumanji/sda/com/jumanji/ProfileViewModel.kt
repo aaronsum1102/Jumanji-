@@ -5,6 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import android.content.Context
 import android.util.Log
+import com.google.android.gms.tasks.Task
+import com.google.firebase.auth.AuthResult
+import com.google.firebase.auth.UserInfo
 import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
@@ -17,10 +20,12 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     val cleanedPins: MutableLiveData<String> = repository.cleanedPins
     val userInfo: MutableLiveData<UserProfile>? = repository.userInfo
 
-    fun saveUserProfile(profile: UserProfile, callback: OnNewUserRegisteredCallback, context: Context) {
-        Single.fromCallable { repository.createNewUser(profile, callback, context) }
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread()).subscribe()
+    fun saveUserProfile(profile: UserProfile, password: String, callback: OnNewUserRegisteredCallback, context: Context) : Task<AuthResult> {
+        return repository.createNewUser(profile, password, callback, context)
+    }
+
+    fun storeProfileDataToDB(userProfile: UserProfile) {
+        repository.storeProfileInfoToDB(userProfile)
     }
 
     fun checkIfUserSignedIn(context: Context) {

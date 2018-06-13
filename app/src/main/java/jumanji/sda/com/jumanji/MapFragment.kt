@@ -46,14 +46,6 @@ interface SetOnPopUpWindowAdapter {
     fun displayPopUpWindow(marker: Marker)
 }
 
-interface OnUrlAvailableCallback {
-    fun storeDataToFirebase(uri: Uri)
-}
-
-interface OnPermissionGrantedCallback {
-    fun actionWithPermission(context: Context)
-}
-
 class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyCallback, SetOnPopUpWindowAdapter {
     companion object {
         private const val LAST_KNOWN_ZOOM = "last_known_zoom"
@@ -62,7 +54,6 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
         private const val CAMERA_PREFERENCE = "camera_preference"
         private const val RESTORE_STATE_FLAG = "restore_state_flag"
         private const val LOCATION_REQUEST_CODE = 300
-        private const val REQUEST_CAMERA_CODE = 100
         private const val REQUEST_SETTING_CHECK = 30
     }
 
@@ -364,17 +355,23 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                     context?.let {
                         when (userChoosenTask) {
                             "Take Photo" -> {
-                                locationViewModel.startLocationUpdates(this.requireContext())
+                                locationViewModel.startLocationUpdates(it)
                                 cameraIntent()
                             }
 
                             "Choose from Library" -> {
-                                UtilCamera.chooseFromGallery(this)
+                                this@MapFragment.context?.let {
+                                    UtilCamera.chooseFromGallery(this@MapFragment, it)
+                                }
+                            }
+                            else -> {
                             }
                         }
                     }
                 } else {
-                    UtilCamera.displayToastForNoPermission(this)
+                    this@MapFragment.context?.let {
+                        UtilCamera.displayMessageForNoPermission(this@MapFragment, it)
+                    }
                 }
             }
         }
@@ -383,10 +380,9 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         val photoRepository = PhotoRepository(email)
-
         val context = this.context
         when (requestCode) {
-            REQUEST_CAMERA_CODE -> {
+            UtilCamera.USE_CAMERA_CODE -> {
                 locationViewModel.stopLocationUpdates()
                 if (resultCode == Activity.RESULT_OK) {
                     val photoFile = File(mCurrentPhotoPath)
@@ -402,34 +398,20 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
             UtilCamera.SELECT_IMAGE_CODE -> {
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     val uri = data.data
-                    val photoExif = UtilCamera.getLatLngFromPicture(uri, this.requireContext())
+                    val photoExif = UtilCamera.getMetadataFromPhoto(uri, this.requireContext())
                     if (photoExif != null) {
                         context?.let {
                             val resizeImageFile = UtilCamera.resizeImage(uri, context)
                             resizeImageFile?.let {
                                 val uriForUpload = UtilCamera.getUriForFile(it, context)
-                                Toast.makeText(context,
-                                        context.getString(R.string.uploadingPhoto),
-                                        Toast.LENGTH_SHORT)
-                                        .show()
+                                notifyUploadingOfPhoto(context)
                                 photoRepository.storePhotoToDatabase(uriForUpload, activity)
                                         .addOnSuccessListener { uploadTask ->
-                                            Toast.makeText(context,
-                                                    context.getString(R.string.successUploadTrashPhoto),
-                                                    Toast.LENGTH_SHORT)
-                                                    .show()
+                                            notifySuccessUploadOfPhoto(context)
                                             uploadTask.storage.downloadUrl
                                                     .addOnSuccessListener { downloadUrl ->
                                                         resizeImageFile.delete()
-                                                        pinViewModel.reportPointForTrash(
-                                                                PinDataInfo(photoExif.long.toFloat(),
-                                                                        photoExif.lat.toFloat(),
-                                                                        photoExif.orientation,
-                                                                        downloadUrl.toString(),
-                                                                        username,
-                                                                        true)
-
-                                                        )
+                                                        updatePinData(downloadUrl, photoExif)
                                                         profileViewModel.updateUserPinNumber(username)
                                                         pinViewModel.loadPinData()
                                                         profileViewModel.updateUserStatistics(username)
@@ -439,11 +421,37 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                             }
                         }
                     } else {
-                        UtilCamera.warningForNoMetadataInPhoto(this.requireContext())
+                        this@MapFragment.context?.let {
+                            UtilCamera.warningForNoMetadataInPhoto(it)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private fun notifyUploadingOfPhoto(context: Context) {
+        Toast.makeText(context,
+                context.getString(R.string.uploadingPhoto),
+                Toast.LENGTH_SHORT)
+                .show()
+    }
+
+    private fun notifySuccessUploadOfPhoto(context: Context) {
+        Toast.makeText(context,
+                context.getString(R.string.successUploadTrashPhoto),
+                Toast.LENGTH_SHORT)
+                .show()
+    }
+
+    private fun updatePinData(downloadUrl: Uri, photoExif: PhotoExif) {
+        pinViewModel.reportPointForTrash(
+                PinDataInfo(photoExif.long.toFloat(),
+                        photoExif.lat.toFloat(),
+                        photoExif.orientation,
+                        downloadUrl.toString(),
+                        username,
+                        true))
     }
 
     private var mCurrentPhotoPath: String = ""
@@ -460,7 +468,7 @@ class MapFragment : androidx.fragment.app.Fragment(), PhotoListener, OnMapReadyC
                         photoFile)
                 intent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
                 intent.putExtra("return-data", true)
-                startActivityForResult(intent, REQUEST_CAMERA_CODE)
+                startActivityForResult(intent, UtilCamera.USE_CAMERA_CODE)
             } catch (ex: IOException) {
                 // Error occurred while creating the File
                 Log.e(ex.message, ex.toString())
