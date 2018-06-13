@@ -1,19 +1,19 @@
 package jumanji.sda.com.jumanji
 
-import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModelProviders
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import androidx.annotation.LayoutRes
-import androidx.constraintlayout.ConstraintSet
-import androidx.fragment.app.Fragment
-import androidx.appcompat.app.AlertDialog
 import android.transition.ChangeBounds
 import android.transition.TransitionManager
 import android.view.*
 import android.view.animation.OvershootInterpolator
+import androidx.annotation.LayoutRes
+import androidx.appcompat.app.AlertDialog
 import androidx.constraintlayout.ConstraintLayout
-import com.squareup.picasso.Picasso
+import androidx.constraintlayout.ConstraintSet
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProviders
 import kotlinx.android.synthetic.main.fragment_profile.*
 
 class ProfileFragment : Fragment() {
@@ -37,10 +37,15 @@ class ProfileFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
 
-        profileViewModel.userInfo?.observe(this, Observer {
-            username = it?.userName
-            if (username != null) usernameText.text = username
-            Picasso.get().load(it?.photoURL).into(profilePhotoView)
+        profileViewModel.userInfo?.observe(this, Observer { profile ->
+            profile?.let {
+                username = profile.userName
+                if (username != null) usernameText.text = username
+                try {
+                    UtilCamera.loadPhotoIntoView(Uri.parse(profile.photoURL), profile.photoOrientation.toInt(), profilePhotoView)
+                } catch (exception: NumberFormatException) {
+                }
+            }
         })
 
         profileViewModel.reportedPins.observe(this, Observer {

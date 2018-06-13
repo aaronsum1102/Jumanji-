@@ -18,6 +18,7 @@ data class UserProfile(
         val userName: String = "",
         val email: String = "",
         val photoURL: String = "",
+        val photoOrientation: String = "0",
         val userId: String = ""
 )
 
@@ -33,6 +34,7 @@ class ProfileRepository(context: Context) {
 
     private val database: FirebaseFirestore = FirebaseFirestore.getInstance()
     private val userAuthentication: FirebaseAuth = FirebaseAuth.getInstance()
+    private val profileInfoCollection  = database.collection("profileInfo")
     val reportedPins: MutableLiveData<String> = MutableLiveData()
     val cleanedPins: MutableLiveData<String> = MutableLiveData()
     val userInfo: MutableLiveData<UserProfile> = MutableLiveData()
@@ -54,7 +56,6 @@ class ProfileRepository(context: Context) {
     }
 
     private fun getUserInformation(context: Context) {
-        Log.d("TAG", "get user info")
         val currentUser = userAuthentication.currentUser
         if (currentUser != null) {
             val userProfile = UserProfile(currentUser.displayName.toString(),
@@ -71,7 +72,7 @@ class ProfileRepository(context: Context) {
 
     fun storeProfileInfoToDB(userProfile: UserProfile) {
         userInfo.postValue(userProfile)
-        database.collection(userProfile.userId).document("userInfo").set(userProfile)
+        profileInfoCollection.document(userProfile.userId).set(userProfile)
     }
 
     fun createNewUser(userProfile: UserProfile, password: String, callback: OnNewUserRegisteredCallback, context: Context): Task<AuthResult> {

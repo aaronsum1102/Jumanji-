@@ -64,18 +64,20 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
                     val resizeImage = UtilCamera.resizeImage(profilePhotoUri, applicationContext)
                     resizeImage?.let {
                         val internalUri = UtilCamera.getUriForFile(resizeImage, applicationContext)
-                        val profile = UserProfile(userName, email, internalUri.toString())
-                        profileViewModel.saveUserProfile(profile, password, this, this)
-                                .continueWith {
-                                    val newProfile = profile.copy(userId = it.result.user.uid)
-                                    photoRepository.storePhotoToDatabase(internalUri, this)
-                                            .addOnSuccessListener { uploadTask ->
-                                                uploadTask.storage.downloadUrl
-                                                        .addOnSuccessListener {
-                                                            profileViewModel.storeProfileDataToDB(newProfile)
-                                                        }
-                                            }
-                                }
+                        orientationFromPhoto?.let {
+                            val profile = UserProfile(userName, email, internalUri.toString(), orientationFromPhoto)
+                            profileViewModel.saveUserProfile(profile, password, this, this)
+                                    .continueWith {
+                                        val newProfile = profile.copy(userId = it.result.user.uid)
+                                        photoRepository.storePhotoToDatabase(internalUri, this)
+                                                .addOnSuccessListener { uploadTask ->
+                                                    uploadTask.storage.downloadUrl
+                                                            .addOnSuccessListener {
+                                                                profileViewModel.storeProfileDataToDB(newProfile)
+                                                            }
+                                                }
+                                    }
+                        }
                     }
                 }
                 saveButton.isEnabled = false
