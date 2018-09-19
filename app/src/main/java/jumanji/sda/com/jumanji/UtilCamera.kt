@@ -184,7 +184,7 @@ object UtilCamera {
         }
     }
 
-    fun useCamera(context: Context, fragment: Fragment?): File? {
+    fun useCamera(context: Context, fragment: Fragment?, activityCompat: Activity?): File? {
         val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
         if (intent.resolveActivity(context.packageManager) != null) {
             val photoFile = createImageFIle(context)
@@ -195,7 +195,7 @@ object UtilCamera {
                 if (fragment != null) {
                     fragment.startActivityForResult(intent, UtilCamera.USE_CAMERA_CODE)
                 } else {
-                    (context as Activity).startActivityForResult(intent, UtilCamera.USE_CAMERA_CODE)
+                    activityCompat?.startActivityForResult(intent, UtilCamera.USE_CAMERA_CODE)
                 }
                 return photoFile
             }

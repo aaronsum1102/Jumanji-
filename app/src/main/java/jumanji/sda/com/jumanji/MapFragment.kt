@@ -319,7 +319,7 @@ class MapFragment : Fragment(), OnMapReadyCallback, SetOnPopUpWindowAdapter {
                     items[item] == "Take Photo" -> {
                         userChoosenTask = "Take Photo"
                         locationViewModel.startLocationUpdates(context)
-                        photo = UtilCamera.useCamera(context, this@MapFragment)
+                        photo = UtilCamera.useCamera(context, this@MapFragment, null)
                     }
                     items[item] == "Choose from Library" -> {
                         userChoosenTask = "Choose from Library"

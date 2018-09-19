@@ -3,32 +3,24 @@ package jumanji.sda.com.jumanji
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProviders
 import kotlinx.android.synthetic.main.activity_create_profile.*
-import java.io.*
 
 interface OnNewUserRegisteredCallback {
     fun onProfileSaveToFirebase()
 }
 
-class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, OnNewUserRegisteredCallback {
-    companion object {
-        private const val REQUEST_CAMERA = 100
-        private const val SELECT_FILE = 200
-    }
-
+class CreateProfileActivity : AppCompatActivity(), TextWatcher, OnNewUserRegisteredCallback {
     val profileViewModel by lazy { ViewModelProviders.of(this)[ProfileViewModel::class.java] }
-    var userChoosenTask: String = ""
 
     private lateinit var profilePhotoUri: Uri
 
@@ -49,7 +41,7 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
         emailField.addTextChangedListener(this)
 
         profilePhoto.setOnClickListener {
-            selectImage()
+            createSelectionDialogForAction()
         }
 
         saveButton.setOnClickListener {
@@ -104,31 +96,25 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
         this.finish()
     }
 
-    override fun selectImage() {
+    private fun createSelectionDialogForAction() {
         val items = arrayOf<CharSequence>("Take Photo", "Choose from Library", "Cancel")
         val builder = AlertDialog.Builder(this@CreateProfileActivity)
         builder.setTitle("Take Photo")
         builder.setItems(items, { dialog, item ->
             when (items[item]) {
                 "Take Photo" -> {
-                    userChoosenTask = "Take Photo"
-                    UtilCamera.checkPermissionBeforeAction(context = this@CreateProfileActivity)
+                    val file = UtilCamera.useCamera(applicationContext, null, this)
+                    file?.let {
+                        profilePhotoUri = UtilCamera.getUriForFile(file, applicationContext)
+                    }
                 }
-
                 "Choose from Library" -> {
-                    userChoosenTask = "Choose from Library"
                     UtilCamera.checkPermissionBeforeAction(context = this@CreateProfileActivity)
                 }
-
                 "Cancel" -> dialog.dismiss()
             }
         })
         builder.show()
-    }
-
-    private fun cameraIntent() {
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        startActivityForResult(intent, REQUEST_CAMERA)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
@@ -147,47 +133,40 @@ class CreateProfileActivity : AppCompatActivity(), TextWatcher, PhotoListener, O
         if (resultCode == Activity.RESULT_OK) {
             val uri = data?.data
             when (requestCode) {
-                SELECT_FILE -> {
+                UtilCamera.SELECT_IMAGE_CODE -> {
                     uri?.let {
                         profilePhotoUri = uri
-                        try {
-                            val orientationFromPhoto = UtilCamera.getMetadataFromPhoto(uri,
-                                    applicationContext).orientation?.toInt()
-                            orientationFromPhoto?.let {
-                                UtilCamera.loadPhotoIntoView(uri, orientationFromPhoto, profilePhoto)
-                            }
-
-                        } catch (exception: NumberFormatException) {
-                        }
+                        displayProfilePhoto(uri)
                     }
                 }
-                REQUEST_CAMERA -> {
-                    onCaptureImageResult(data)
+                UtilCamera.USE_CAMERA_CODE -> {
+                    if (this::profilePhotoUri.isInitialized) {
+                        //TODO to fix photo orientation for loading.
+                        val orientationFromPhoto = UtilCamera.getMetadataFromPhoto(profilePhotoUri,
+                                applicationContext).orientation?.toInt()
+                        orientationFromPhoto?.let {
+                            val inputStream = applicationContext.contentResolver.openInputStream(profilePhotoUri)
+                            val bitmap = BitmapFactory.decodeStream(inputStream)
+                            Log.e("see", "load photo")
+                            profilePhoto.setImageBitmap(bitmap)
+                        }
+                    }
                 }
             }
         }
     }
 
-    private fun onCaptureImageResult(data: Intent?) {
-        val thumbnail = data?.extras?.get("data") as Bitmap
-        val bytes = ByteArrayOutputStream()
-        thumbnail.compress(Bitmap.CompressFormat.JPEG, 90, bytes)
-        val destination = File(Environment.getExternalStorageDirectory(),
-                System.currentTimeMillis().toString() + ".jpg")
-        val fo: FileOutputStream
+    private fun displayProfilePhoto(uri: Uri) {
         try {
-            destination.createNewFile()
-            fo = FileOutputStream(destination)
-            fo.write(bytes.toByteArray())
-            fo.close()
-        } catch (e: FileNotFoundException) {
-            e.printStackTrace()
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
+            val orientationFromPhoto = UtilCamera.getMetadataFromPhoto(uri,
+                    applicationContext).orientation?.toInt()
+            orientationFromPhoto?.let {
+                UtilCamera.loadPhotoIntoView(uri, orientationFromPhoto, profilePhoto)
+            }
 
-        profilePhoto.setImageBitmap(thumbnail)
-        profilePhotoUri = Uri.fromFile(destination.absoluteFile)
+        } catch (exception: NumberFormatException) {
+            Log.e("ProfilePhoto", "Photo orientation data is invalid.")
+        }
     }
 
     override fun onProfileSaveToFirebase() {
